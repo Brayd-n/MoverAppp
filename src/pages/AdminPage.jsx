@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../firebase/config';
+import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 function LoginForm() {
   const { login } = useAuth();
@@ -101,32 +103,45 @@ function UploadItem({ file, onRemove }) {
     setError('');
 
     try {
-      const storageRef = ref(storage, `items/${Date.now()}_${file.name}`);
-      const task = uploadBytesResumable(storageRef, file);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-      task.on(
-        'state_changed',
-        (snap) => {
-          setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100));
-        },
-        (err) => {
-          setError('Upload failed. Try again.');
-          setProgress(null);
-          console.error(err);
-        },
-        async () => {
-          const url = await getDownloadURL(task.snapshot.ref);
-          await addDoc(collection(db, 'items'), {
-            imageUrl: url,
-            name: name.trim() || null,
-            status: 'pending',
-            uploadedAt: serverTimestamp(),
-          });
-          setProgress('done');
-        }
-      );
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(
+          'POST',
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+        );
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = async () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            await addDoc(collection(db, 'items'), {
+              imageUrl: data.secure_url,
+              name: name.trim() || null,
+              status: 'pending',
+              uploadedAt: serverTimestamp(),
+            });
+            setProgress('done');
+            resolve();
+          } else {
+            reject(new Error(xhr.responseText));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
+      });
     } catch (err) {
-      setError('Upload failed.');
+      console.error(err);
+      setError('Upload failed. Try again.');
       setProgress(null);
     }
   }
