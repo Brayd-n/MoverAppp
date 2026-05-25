@@ -93,7 +93,13 @@ export default function SwipePage() {
           </p>
         </button>
 
-        <div className="w-24" /> {/* spacer */}
+        <button
+          onClick={() => navigate('/keep-list')}
+          className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-md text-gray-700 font-medium text-sm active:scale-95 transition-transform"
+        >
+          <span>Keep List</span>
+          <span className="text-lg">💚</span>
+        </button>
       </div>
 
       {/* Card Stack */}

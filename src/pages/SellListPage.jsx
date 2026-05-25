@@ -6,7 +6,6 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +29,10 @@ function SellItem({ item }) {
 
   async function moveBack() {
     await updateDoc(doc(db, 'items', item.id), { status: 'pending' });
+  }
+
+  async function markTrash() {
+    await updateDoc(doc(db, 'items', item.id), { status: 'trash' });
   }
 
   function handlePriceKey(e) {
@@ -113,14 +116,24 @@ function SellItem({ item }) {
             </motion.span>
           )}
 
-          {/* Move back to queue */}
-          <button
-            onClick={moveBack}
-            className="ml-auto text-gray-300 hover:text-gray-500 active:scale-90 transition-all text-lg"
-            title="Put back in queue"
-          >
-            ↩
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            {/* Trash — throw it out */}
+            <button
+              onClick={markTrash}
+              className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 hover:text-red-400 hover:bg-red-50 active:scale-90 transition-all text-base"
+              title="Throw it out"
+            >
+              🗑️
+            </button>
+            {/* Undo — put back in queue */}
+            <button
+              onClick={moveBack}
+              className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-300 hover:text-gray-500 active:scale-90 transition-all text-lg"
+              title="Put back in queue"
+            >
+              ↩
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>
