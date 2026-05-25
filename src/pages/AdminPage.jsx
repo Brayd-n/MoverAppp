@@ -103,16 +103,14 @@ function UploadItem({ file, onRemove }) {
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      // Step 1: upload image to Cloudinary
+      const cloudinaryData = await new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-      await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open(
-          'POST',
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
-        );
+        xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -120,28 +118,26 @@ function UploadItem({ file, onRemove }) {
           }
         };
 
-        xhr.onload = async () => {
-          if (xhr.status === 200) {
-            const data = JSON.parse(xhr.responseText);
-            await addDoc(collection(db, 'items'), {
-              imageUrl: data.secure_url,
-              name: name.trim() || null,
-              status: 'pending',
-              uploadedAt: serverTimestamp(),
-            });
-            setProgress('done');
-            resolve();
-          } else {
-            reject(new Error(xhr.responseText));
-          }
+        xhr.onload = () => {
+          if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
+          else reject(new Error(`Cloudinary ${xhr.status}: ${xhr.responseText}`));
         };
-
         xhr.onerror = () => reject(new Error('Network error'));
         xhr.send(formData);
       });
+
+      // Step 2: save the image URL + metadata to Firestore
+      await addDoc(collection(db, 'items'), {
+        imageUrl: cloudinaryData.secure_url,
+        name: name.trim() || null,
+        status: 'pending',
+        uploadedAt: serverTimestamp(),
+      });
+
+      setProgress('done');
     } catch (err) {
-      console.error(err);
-      setError('Upload failed. Try again.');
+      console.error('Upload error:', err);
+      setError(err.message || 'Upload failed. Try again.');
       setProgress(null);
     }
   }

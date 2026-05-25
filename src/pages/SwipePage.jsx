@@ -34,16 +34,29 @@ export default function SwipePage() {
   }
 
   useEffect(() => {
+    // No orderBy here to avoid needing a composite index — we sort client-side
     const q = query(
       collection(db, 'items'),
-      where('status', '==', 'pending'),
-      orderBy('uploadedAt', 'asc')
+      where('status', '==', 'pending')
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setItems(data);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aTime = a.uploadedAt?.toMillis?.() ?? 0;
+            const bTime = b.uploadedAt?.toMillis?.() ?? 0;
+            return aTime - bTime;
+          });
+        setItems(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Firestore error:', err);
+        setLoading(false);
+      }
+    );
     return unsub;
   }, []);
 
